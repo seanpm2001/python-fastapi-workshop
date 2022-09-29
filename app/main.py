@@ -1,10 +1,36 @@
 import json
 import pathlib
 
-from fastapi import FastAPI, Path, Query
+from fastapi import FastAPI, HTTPException, Path, Query
 from pydantic import BaseModel, Field
 
 app = FastAPI(title="Restaurant API")
+
+
+RESTAURANTS_BY_ID = {}
+
+
+@app.on_event("startup")
+def on_startup():
+    print("READING THE RESTAURANTS FILE")
+    data_file_path = pathlib.Path(__file__).parent / "restaurants.json"
+
+    with open(data_file_path) as f:
+        raw_data = json.load(f)
+
+    for raw_restaurant in raw_data["restaurants"]:
+        lon, lat = raw_restaurant["location"]
+        restaurant_id = raw_restaurant["id"]
+        restaurant = Restaurant(
+            name=raw_restaurant["name"],
+            description=raw_restaurant["description"],
+            id=restaurant_id,
+            location=Location(
+                city=raw_restaurant["city"],
+                coordinates=Coordinates(lon=lon, lat=lat),
+            ),
+        )
+        RESTAURANTS_BY_ID[restaurant_id] = restaurant
 
 
 @app.get("/")
@@ -26,26 +52,14 @@ def showcase_features(
     return {"foo": "bar", "user_id": user_id}
 
 
-"""
-[
-  {
-    "name": "Example restaurant",
-    "description": "Example description",
-    "id": "unique-id-for-the-restaurant",
-    "location": {
-      "city": "Example city",
-      "coordinates": {
-        "lat": 60.169938852212965,
-        "lon": 24.941325187683105
-      }
-    }
-  }
-]
-"""
+class Coordinates(BaseModel):
+    lon: float
+    lat: float
 
 
 class Location(BaseModel):
     city: str
+    coordinates: Coordinates
 
 
 class Restaurant(BaseModel):
@@ -57,18 +71,11 @@ class Restaurant(BaseModel):
 
 @app.get("/restaurants", response_model=list[Restaurant])
 def get_restaurants():
-    data_file_path = pathlib.Path(__file__).parent / "restaurants.json"
+    return list(RESTAURANTS_BY_ID.values())
 
-    with open(data_file_path) as f:
-        raw_data = json.load(f)
 
-    restaurants = []
-    for raw_restaurant in raw_data["restaurants"]:
-        restaurant = Restaurant(
-            name=raw_restaurant["name"],
-            description=raw_restaurant["description"],
-            id=raw_restaurant["id"],
-            location=Location(city=raw_restaurant["city"]),
-        )
-        restaurants.append(restaurant)
-    return restaurants
+@app.get("/restaurants/{restaurant_id}", response_model=Restaurant)
+def get_restaurant(restaurant_id: str):
+    if restaurant_id in RESTAURANTS_BY_ID:
+        return RESTAURANTS_BY_ID[restaurant_id]
+    raise HTTPException(status_code=404, detail="Restaurant not found")
