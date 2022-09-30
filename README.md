@@ -95,12 +95,22 @@ Run the server (`--reload` automatically restarts the server when there are chan
 uvicorn app.main:app --reload
 ```
 
+Run the tests (doesn't require running server):
+```
+pytest
+```
+
 The API documentation is available in http://127.0.0.1:8000/docs.
 
 ### With Docker
 Run the app:
 ```
 docker-compose up
+```
+
+Run the tests:
+```
+docker-compose exec restaurant-api poetry run pytest
 ```
 
 The API documentation is available in http://127.0.0.1:8000/docs.
